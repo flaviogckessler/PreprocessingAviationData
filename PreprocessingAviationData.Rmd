@@ -2,6 +2,7 @@
 title: "Preprocessing Brazilian aviation data for RGraphSpace vignette"
 author: 
 - name: Flávio Gabriel Carazza-Kessler
+- name: Sysbiolab Team
 date: "`r Sys.Date()`"
 bibliography: bibliography.bib
 output: 
