@@ -1,18 +1,15 @@
----
-title: "Preprocessing Brazilian aviation data for RGraphSpace vignette"
-author: 
-- name: Flávio Gabriel Carazza-Kessler
-- name: Sysbiolab Team
-date: "22 July 2026"
----
+# Preprocessing Brazilian aviation data for RGraphSpace vignette 
+
+Flávio Gabriel Carazza-Kessler, Sysbiolab Team
+22 July 2026
 
 # Summary
 
 Here is performed the preprocessment of the data used in the RGraphSpace vignette, "Using RGraphSpace for spatial data analysis".
 
-Please access the full preprocessment workflow: [Preprocessment Aviation Data](https://sysbiolab.github.io/RGraphSpace/articles/get-started.html){target="_blank" rel="noopener"}
+Please access the full preprocessment workflow: [Preprocessment Aviation Data](https://sysbiolab.github.io/RGraphSpace/articles/get-started.html)
 
-If you are not familiar to *RGraphSpace*, please see the available workflows: [Get Started](https://sysbiolab.github.io/RGraphSpace/articles/get-started.html){target="_blank" rel="noopener"}
+If you are not familiar to *RGraphSpace*, please see the available workflows: [Get Started](https://sysbiolab.github.io/RGraphSpace/articles/get-started.html)
 
 
 # Citation
