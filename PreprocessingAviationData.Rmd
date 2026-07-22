@@ -1,0 +1,389 @@
+---
+title: "Preprocessing Brazilian aviation data for RGraphSpace vignette"
+author: 
+- name: Flávio Gabriel Carazza-Kessler
+date: "`r Sys.Date()`"
+bibliography: bibliography.bib
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE, purl=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  collapse = TRUE,
+  comment = "#>",
+  fig.align = "center",
+  fig.width = 7,
+  fig.height = 5
+  )
+```
+
+# Overview
+
+The *RGraphSpace* vignette "Using RGraphSpace for Spatial Data Analysis." performs the analysis of Brazilian aviation data as an example for spatial data visualization using the package. The data used there needs some steps of preprocessment that are shown below. The preprocessed data will be saved for further load on the refered vignette.
+
+If you are not familiar to *RGraphSpace*, please see the available workflows: [Get Started](https://sysbiolab.github.io/RGraphSpace/articles/get-started.html){target="_blank" rel="noopener"}
+
+## Vignette briefing:
+
+Flight and airport data are downloaded with *flightsbr* [@Pereira2022], an R package that retrieves aviation records from Brazil's Civil Aviation Agency (ANAC). Geographical boundaries of Brazil are obtained with the *rnaturalearth* package [@Massicotte2026], which returns *sf* objects. *sf* is an established package for spatial data science [@Pebesma2018,@Pebesma2023]. The preprocessed airports, flights and geographical boundaries data are saved for further load.
+
+# Before you start
+
+This vignette retrieves data from external databases, including flight records from ANAC. Therefore, some calls may take a few minutes to run.
+
+**Computational requirement:**
+
+- Hardware: RAM \>= 12 GB
+
+- Software: R (\>=4.5) and RStudio
+
+# Required Packages
+
+```{r check-required-packages, eval=FALSE, message=FALSE}
+# Check required packages for this vignette
+if(!require("flightsbr", quietly = TRUE)){
+  remotes::install_github("ipeaGIT/flightsbr")
+}
+if(!require("data.table", quietly = TRUE)){
+  install.packages("data.table")
+}
+if(!require("ggplot2", quietly = TRUE)){
+  install.packages("ggplot2")
+}
+if(!require("airportr", quietly = TRUE)){
+  install.packages("airportr")
+}
+if(!require("dplyr", quietly = TRUE)){
+  install.packages("dplyr")
+}
+if(!require("sf", quietly = TRUE)){
+  install.packages("sf")
+}
+if(!require("rnaturalearth", quietly = TRUE)){
+  install.packages("rnaturalearth")
+}
+if(!require("maps", quietly = TRUE)){
+  install.packages("maps")
+}
+if(!require("ggpubr", quietly = TRUE)){
+  install.packages("ggpubr")
+}
+if(!require("ggrepel", quietly = TRUE)){
+  install.packages("ggrepel")
+}
+```
+
+```{r Load packages, eval=TRUE, message=FALSE}
+# Load packages
+library("flightsbr")
+#library("data.table")
+library("ggplot2")
+library("airportr")
+library("dplyr")
+library("sf")
+library("rnaturalearth")
+#library("maps")
+#library("ggpubr")
+#library("ggrepel")
+```
+
+# Data sources
+
+First, we need to load three datasets: (i) flight records, (ii) airport metadata, and (iii) geographic boundary data.
+
+## Defining a helper function
+
+The helper function below keeps only flights for which both the origin and destination airports are present in a given airport dataset. We use it twice: first to remove international flights, and later to subset flights within the Southeast region.
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+only_from_airports <- function(flights,airports){
+  for(i in 1:length(flights[[1]])){
+    flights$accessory[i] <- flights[[1]][i] %in% airports$codigo_oaci &&
+      flights[[2]][i] %in% airports$codigo_oaci
+  }
+  flights_clean <- flights %>%
+    filter(accessory == TRUE) %>%
+    select(-c("accessory"))
+  
+  return(flights_clean)
+}
+```
+
+## Flight records
+
+In this vignette, we are interested in all domestic flights recorded in **2025**, that is, flights for which both departure and arrival airports are located in Brazil. In this section, we first load all flights from 2025, including the international ones. The flight data are filtered in later steps.
+
+**Note:** This may take some time.
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+df_2025_2 <- flightsbr::read_flights(
+  date = 2025,
+  showProgress = FALSE,
+  select = c('id_empresa', 'nr_voo', 'dt_partida_real',
+             'sg_iata_origem' , 'sg_iata_destino')
+)
+
+head(df_2025_2)
+```
+
+The departure and arrival airports in `df_2025_2` are stored in the `sg_iata_origem` and `sg_iata_destino` columns, respectively. These airports are identified using the International Air Transport Association (IATA) codes, which are unique three-letter location codes. Airports are also identified by four-letter International Civil Aviation Organization (ICAO) codes.
+
+IATA codes are primarily used for passenger-facing purposes, such as baggage ticketing and flight booking. ICAO codes, however, are used for air traffic control and flight operations. After loading the data, code conversion is necessary to integrate flight and airport datasets.
+
+## Airport metadata
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+airports_all <- flightsbr::read_airports(
+  type = 'all', 
+  showProgress = FALSE
+)
+
+head(airports_all)
+```
+
+Note that the first column, `codigo_oaci`, contains the ICAO code for each airport. In the `airports_all` dataset, IATA codes are not available. The airport metadata also include the city, state, name, latitude, longitude, altitude, and type (private or public) of each airport.
+
+### Formatting airport data
+
+Although the `latitude` and `longitude` columns of `airport_all` contain several `NA` values, we can extract geographic information from the `longeopoint` and `latgeopoint` columns. These latter columns are stored as character vectors, so they must be to convert to double vectors. The airport metadata is then converted to an *sf* object, in which the geographic coordinates are stored as `POINT` geometries.
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+airports_all$latgeopoint <- as.double(gsub(",",".",airports_all$latgeopoint))
+airports_all$longeopoint <- as.double(gsub(",",".",airports_all$longeopoint))
+airports_all$longitude <- airports_all$longeopoint
+airports_all$latitude <- airports_all$latgeopoint
+sf_air_all <- sf::st_as_sf(airports_all, 
+                           coords = c("longeopoint", "latgeopoint"),
+                           crs = 4674)
+
+head(sf_air_all)
+```
+
+## Geographical boundaries
+
+Here, we load the Brazilian map and a subset of the Southeast region of Brazil. The Southeast region comprises four states: São Paulo (SP), Minas Gerais (MG), Rio de Janeiro (RJ) and Espírito Santo (ES).
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+mapa_brasil <- ne_states(country = "brazil", returnclass = "sf") %>%
+  select(c("name","postal","latitude","longitude","geometry"))
+mapa_brasil <- st_transform(mapa_brasil)
+
+head(mapa_brasil)
+
+se_states <- mapa_brasil %>% filter(postal %in% c('RJ','SP','MG','ES'))
+```
+
+Plot Brazilian map:
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+ggplot() +
+  geom_sf(data=mapa_brasil, fill="light grey", color="dark grey", size=.15, show.legend = FALSE) +
+  labs(subtitle="Brazilian States", size=8) +
+  theme_minimal() 
+```
+
+Plot states from Brazil's southeast region:
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+ggplot() +
+  geom_sf(data=se_states, fill="light grey", color="dark grey", size=.15, show.legend = FALSE) +
+  labs(subtitle="Southeast Region", size=8) +
+  theme_minimal()
+```
+
+Plot airports:
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+ggplot() +
+  geom_sf(data=mapa_brasil, fill="light grey", color="dark grey", size=.15, show.legend = FALSE) +
+  labs(subtitle="Brazilian Airports") +
+  geom_sf(data = sf_air_all,
+          aes(geometry = geometry,
+              color = type),
+          size = .5) +
+  theme_minimal() 
+```
+
+# Preparing the data
+
+## Harmonizing IATA and ICAO airport codes
+
+First, we collect all airports present in flights data (`df_2025_2`), including both departure and arrival airports, and store them in a data frame named `IATA_to_ICAO`.
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+vec<-sort(unique(c(df_2025_2$sg_iata_origem,df_2025_2$sg_iata_destino)))
+vec<-tail(vec,-2)
+
+IATA_to_ICAO <- data.frame(IATA = vec, ICAO = NA, row.names = vec)
+rm(vec)
+```
+
+Number of unique airports in flights data:
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+length(IATA_to_ICAO$IATA)
+```
+
+Now, we assign the ICAO codes to each airport present in `IATA_to_ICAO`. The `for` loop shown below skips iterations thar return errors during the `airport_lookup()` search.
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+for (i in 1:length(IATA_to_ICAO$IATA)) {
+  # Wrap the failing code in tryCatch
+  result <- tryCatch({
+    airportr::airport_lookup(IATA_to_ICAO$IATA[i],
+                   input_type = "IATA", output_type = "ICAO") # Your function that might fail
+  }, error = function(e) {
+    # If error occurs, return a special value or just continue
+    return(NULL) 
+  })
+  
+  # Skip to the next iteration if an error occurred
+  if (is.null(result)) {
+    next
+  }
+  # Process successful result here
+  IATA_to_ICAO$ICAO[i] <- result
+}
+
+head(IATA_to_ICAO)
+```
+
+Assigning ICAO codes to the departure and destination airports in the flights data.
+
+**Note:** This may take some time
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+df_2025_2$sg_icao_origem <- NA
+df_2025_2$sg_icao_destino <-  NA
+
+for(i in 1:length(IATA_to_ICAO$IATA)){
+  departure_index <- which(df_2025_2$sg_iata_origem == IATA_to_ICAO$IATA[i])
+  arrival_index <- which(df_2025_2$sg_iata_destino == IATA_to_ICAO$IATA[i])
+  
+  icao <- IATA_to_ICAO[IATA_to_ICAO$IATA[i],2]
+  
+  df_2025_2$sg_icao_origem[departure_index] <- icao 
+  df_2025_2$sg_icao_destino[arrival_index] <-  icao
+  
+  print(c(i,IATA_to_ICAO$IATA[i],icao))
+}
+rm(departure_index,arrival_index)
+
+head(df_2025_2)
+```
+
+## Cleaning flight records
+
+Once we have converted the airport codes in the flight data, we filter and reshape the data to remove `NA` values and dpulicate departure-arrivals pairs.
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+flights_clean_2025 <- na.omit(df_2025_2) %>%
+  dplyr::select(sg_icao_origem,sg_icao_destino) %>%
+  add_count(across(everything()),name = "flights_count") %>%
+  unique()
+```
+
+Number of unique departures-arrivals pairs:
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+length(flights_clean_2025$sg_icao_origem)
+```
+
+Total number of flights after selections and code translation:
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+sum(flights_clean_2025$flights_count)
+```
+
+In `flights_clean_2025`, each row represent a unique departure-arrival pair from the 2025 flight records. The `flights_count` column indicates the number of flights of each pair.
+
+**Note 1:** Flights are directional: A → B is different than B → A.\
+**Note 2:** This dataset still contains international flights, that is, flights with either an arrival or departure airport located outside Brazil.
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+head(flights_clean_2025)
+```
+
+Removing flights with 100 or fewer counts:
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+flights_cf_25 <- flights_clean_2025 %>% filter(flights_count > 100)
+```
+
+## Selecting active airports
+
+Not all airports present in `sf_air_all` were active in 2025. Therefore, we only keep in airports that are present in the filtered flight data.
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+active_airports <- unique(c(flights_cf_25$sg_icao_origem,
+                            flights_cf_25$sg_icao_destino))
+```
+
+Number of active airports (domestic and international):
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+length(active_airports)
+```
+
+The `flights_cf_25` dataset still contains both domestic and international flights. For this reason, we need to remove international airports from `active_airports`. This can be done by checking which active airport are present in `sf_air_all`, our database of Brazilian airports.
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+active_airports <- sf_air_all %>% filter(codigo_oaci %in% active_airports)
+
+rownames(active_airports) <- active_airports$codigo_oaci
+active_airports$latitude <- st_coordinates(active_airports$geometry)[,2]
+active_airports$longitude <- st_coordinates(active_airports$geometry)[,1]
+```
+
+Number of active airports (only domestic):
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+length(active_airports$codigo_oaci)
+```
+
+Plot active airports:
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+ggplot() +
+  geom_sf(data=mapa_brasil, fill="light grey", color="dark grey", size=.15, show.legend = FALSE) +
+  labs(subtitle="Brazilian active airports in 2025") +
+  geom_sf(data = active_airports,
+          aes(geometry = geometry,
+              color = type),
+          size = 1) +
+  theme_minimal() 
+```
+
+## Filtering domestic flights
+
+After airport filtering, the `active_airports` contains only airports that meet two criteria: (i) they had more than 100 flights in 2025, and (ii) they are located in Brazil. Therefore, we can use `active_airports` to remove international flights from `flights_cf_25`. This task is performed by the helper function `only_from_airports()`.
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+flights_cf_25 <- only_from_airports(flights_cf_25,active_airports)
+```
+
+# Saving Proprocessed data
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+save(mapa_brasil, flights_cf_25, active_airports, file = "sf_brazilflights_2025.RData")
+tools::resaveRdaFiles(paths = "sf_brazilflights_2025.RData")
+```
+
+# Citation
+
+If you use *RGraphSpace*, please cite:
+
+- Sysbiolab Team (2026). RGraphSpace: A lightweight interface between 'igraph' and 'ggplot2' graphics. R package version 1.2.4. DOI: 10.32614/CRAN.package.RGraphSpace
+
+# Session information
+
+```{r label='Session information', eval=TRUE, echo=FALSE}
+sessionInfo()
+```
+
+# References
