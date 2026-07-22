@@ -377,8 +377,8 @@ flights_cf <- only_from_airports(flights_cf,active_airports)
 Now all data were loaded and filtered, so we will save them for RGraphSpace vignette:
 
 ```{r, eval=TRUE, message=FALSE, results='hide'}
-save(mapa_brasil, se_states, flights_cf, active_airports, file = "sf_brazilflights_2025.RData")
-tools::resaveRdaFiles(paths = "sf_brazilflights_2025.RData")
+save(mapa_brasil, se_states, flights_cf, active_airports, file = "sf_brazilflights.RData")
+tools::resaveRdaFiles(paths = "sf_brazilflights.RData")
 ```
 
 # Citation
