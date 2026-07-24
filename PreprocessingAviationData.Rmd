@@ -1,15 +1,19 @@
 ---
 title: "Preprocessing Brazilian aviation data for RGraphSpace vignette"
+subtitle: "ANAC flights, airports, spatial data, and RGraphSpace"
 author: 
 - name: Flávio Gabriel Carazza-Kessler
 - name: Sysbiolab Team
 date: "`r Sys.Date()`"
 bibliography: bibliography.bib
-output: 
+output:
   html_document:
     toc: true
     toc_float: true
     toc_depth: 2
+    self_contained: true
+    includes:
+      in_header: seo.html
 ---
 
 ```{r setup, include=FALSE, purl=FALSE}
@@ -25,13 +29,11 @@ knitr::opts_chunk$set(
 
 # Overview
 
-The *RGraphSpace* vignette "Using RGraphSpace for Spatial Data Analysis." performs the analysis of Brazilian aviation data as an example for spatial data visualization using the package. The data used there needs some steps of preprocessment that are shown below. The preprocessed data will be saved for further load on the refered vignette.
+This vignette demonstrates how to preprocess Brazilian flight and airport data in R for spatial network analysis with RGraphSpace. It downloads **2024** flight records from Brazil’s National Civil Aviation Agency using the *flightsbr* [@Pereira2022] package, harmonizes IATA and ICAO airport codes, filters domestic routes, and prepares sf objects for spatial visualization.
+
+The resulting objects contain Brazilian geographic boundaries, active airport locations, and aggregated origin–destination flight counts. These objects are saved for use in the RGraphSpace spatial-data vignette.
 
 If you are not familiar to *RGraphSpace*, please see the available workflows: [Get Started](https://sysbiolab.github.io/RGraphSpace/articles/get-started.html){target="_blank" rel="noopener"}
-
-## Vignette briefing:
-
-Flight and airport data are downloaded with *flightsbr* [@Pereira2022], an R package that retrieves aviation records from Brazil's Civil Aviation Agency (ANAC). Geographical boundaries of Brazil are obtained with the *rnaturalearth* package [@Massicotte2026], which returns *sf* objects. *sf* is an established package for spatial data science [@Pebesma2018,@Pebesma2023]. The preprocessed airports, flights and geographical boundaries data are saved for further load.
 
 # Before you start
 
@@ -47,42 +49,20 @@ This vignette retrieves data from external databases, including flight records f
 
 ```{r check-required-packages, eval=FALSE, message=FALSE}
 # Check required packages for this vignette
+if(!require("data.table", quietly = TRUE)){install.packages("data.table")}
+if(!require("ggplot2", quietly = TRUE)){install.packages("ggplot2")}
+if(!require("airportr", quietly = TRUE)){install.packages("airportr")}
+if(!require("dplyr", quietly = TRUE)){install.packages("dplyr")}
+if(!require("sf", quietly = TRUE)){install.packages("sf")}
+if(!require("rnaturalearth", quietly = TRUE)){install.packages("rnaturalearth")}
+if(!require("maps", quietly = TRUE)){install.packages("maps")}
+if(!require("ggpubr", quietly = TRUE)){install.packages("ggpubr")}
+if(!require("ggrepel", quietly = TRUE)){install.packages("ggrepel")}
+if(!require("stringr", quietly = TRUE)){install.packages("stringr")}
 if(!require("flightsbr", quietly = TRUE)){
-  remotes::install_github("ipeaGIT/flightsbr")
-}
-if(!require("data.table", quietly = TRUE)){
-  install.packages("data.table")
-}
-if(!require("ggplot2", quietly = TRUE)){
-  install.packages("ggplot2")
-}
-if(!require("airportr", quietly = TRUE)){
-  install.packages("airportr")
-}
-if(!require("dplyr", quietly = TRUE)){
-  install.packages("dplyr")
-}
-if(!require("sf", quietly = TRUE)){
-  install.packages("sf")
-}
-if(!require("rnaturalearth", quietly = TRUE)){
-  install.packages("rnaturalearth")
-}
+  remotes::install_github("ipeaGIT/flightsbr")}
 if(!require("rnaturalearthhires", quietly = TRUE)){
-  remotes::install_github("ropensci/rnaturalearthhires")
-}
-if(!require("maps", quietly = TRUE)){
-  install.packages("maps")
-}
-if(!require("ggpubr", quietly = TRUE)){
-  install.packages("ggpubr")
-}
-if(!require("ggrepel", quietly = TRUE)){
-  install.packages("ggrepel")
-}
-if(!require("stringr", quietly = TRUE)){
-  install.packages("stringr")
-}
+  remotes::install_github("ropensci/rnaturalearthhires")}
 ```
 
 ```{r Load packages, eval=TRUE, message=FALSE}
@@ -382,8 +362,8 @@ colnames(flights_cf)[3] <- "weight"
 Now all data from Brazilian flights recors were loaded and filtered, so we will save them for RGraphSpace vignette:
 
 ```{r, eval=TRUE, message=FALSE, results='hide'}
-save(mapa_brasil, flights_cf, active_airports, file = "sf_brazilflights.RData")
-tools::resaveRdaFiles(paths = "sf_brazilflights.RData")
+save(mapa_brasil, flights_cf, active_airports, file = "data/sf_brazilflights.RData")
+tools::resaveRdaFiles(paths = "data/sf_brazilflights.RData")
 ```
 
 # Southeast regional network
@@ -464,8 +444,8 @@ colnames(se_flights)[3] <- "weight"
 **5) Save the preprocessed flight data for Brazil’s Southeast Region.**
 
 ```{r, eval=TRUE, message=FALSE, results='hide'}
-save(se_states, se_flights, se_airports, file = "sf_SoutheastFlights.RData")
-tools::resaveRdaFiles(paths = "sf_SoutheastFlights.RData")
+save(se_states, se_flights, se_airports, file = "data/sf_SoutheastFlights.RData")
+tools::resaveRdaFiles(paths = "data/sf_SoutheastFlights.RData")
 ```
 # Citation
 
