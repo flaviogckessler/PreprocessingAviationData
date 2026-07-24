@@ -10,7 +10,7 @@ Here is performed the preprocessment of the data used in the RGraphSpace vignett
 
 Please access the full preprocessment workflow: [Preprocessment Aviation Data](https://flaviogckessler.github.io/PreprocessingAviationData/PreprocessingAviationData.html)
 
-If you are not familiar to *RGraphSpace*, please see the available workflows: [Get Started](https://sysbiolab.github.io/RGraphSpace/articles/get-started.html)
+If you are not familiar to *RGraphSpace*, please see the available workflows: [RGraphSpace - Get Started](https://sysbiolab.github.io/RGraphSpace/articles/get-started.html)
 
 
 # Citation

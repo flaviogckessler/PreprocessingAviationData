@@ -80,6 +80,9 @@ if(!require("ggpubr", quietly = TRUE)){
 if(!require("ggrepel", quietly = TRUE)){
   install.packages("ggrepel")
 }
+if(!require("stringr", quietly = TRUE)){
+  install.packages("stringr")
+}
 ```
 
 ```{r Load packages, eval=TRUE, message=FALSE}
@@ -372,15 +375,79 @@ After airport filtering, the `active_airports` contains only airports that meet 
 flights_cf <- only_from_airports(flights_cf,active_airports)
 ```
 
-# Saving Preprocessed data
+## Saving Preprocessed data
 
-Now all data were loaded and filtered, so we will save them for RGraphSpace vignette:
+Now all data from Brazilian flights recors were loaded and filtered, so we will save them for RGraphSpace vignette:
 
 ```{r, eval=TRUE, message=FALSE, results='hide'}
-save(mapa_brasil, se_states, flights_cf, active_airports, file = "sf_brazilflights.RData")
+save(mapa_brasil, flights_cf, active_airports, file = "sf_brazilflights.RData")
 tools::resaveRdaFiles(paths = "sf_brazilflights.RData")
 ```
 
+# Southeast regional network
+
+Next, we create a regional subset focused on airports in Brazil’s Southeast Region, which includes some of the country’s busiest airports. The objective is to examine the relationship between the number of flights and the population of the city served by each airport. The preprocessing workflow comprises the following steps:
+
+1. Select active airports and flight records from Brazil’s Southeast Region.
+2. Identify the city associated with each airport.
+3. Retrieve the population of each city.
+4. Retain only flights with both origin and destination in the Southeast Region.
+5. Save the preprocessed flight data for Brazil’s Southeast Region.
+
+**1) Select active airports and flight records from Brazil’s Southeast Region.**
+
+```{r, eval=TRUE, message=FALSE}
+se_airports <- active_airports %>% 
+  filter(uf %in% c("Espírito Santo","Minas Gerais","Rio de Janeiro","São Paulo"))
+```
+
+**2) Identify the city associated with each airport.**
+
+```{r, eval=TRUE, message=FALSE}
+cities <- se_airports %>% select(c(municipio))
+cities <- as.data.frame(cities) %>% select(-c("geometry"))
+```
+
+After identifying the cities served  by all active airports in Brazil's Southeast Region, special characters must br removed and the capitalization of city names standardized. These adjustments are required to matching the city names with those in the population database.
+
+```{r, eval=TRUE, message=FALSE}
+cities <- cities |>
+  mutate(
+    name = municipio |>
+      iconv(to = "ASCII//TRANSLIT") |>
+      stringr::str_to_title() |>
+      stringr::str_replace_all(
+        "\\b(?:Do|Da|De|Dos|Das)\\b",
+        tolower
+      )
+  )
+```
+
+**3) Retrieve the population of each city.**
+
+```{r, eval=TRUE, message=FALSE}
+data(world.cities, package = "maps")
+cities2 <- subset(world.cities, country.etc == "Brazil" & 
+                   name %in% cities$name) %>%
+  select(c("name","pop"))
+cities <- left_join(cities,cities2,by= "name")
+
+se_airports$pop <- cities[match(se_airports$municipio,cities$municipio),3]
+rm(cities,cities2,world.cities)
+```
+
+**4) Retain only flights with both origin and destination in the Southeast Region.**
+
+```{r, eval=TRUE, message=FALSE}
+se_flights <- only_from_airports(flights_cf,se_airports)
+```
+
+**5) Save the preprocessed flight data for Brazil’s Southeast Region.**
+
+```{r, eval=TRUE, message=FALSE, results='hide'}
+save(se_states, se_flights, se_airports, file = "sf_SoutheastFlights.RData")
+tools::resaveRdaFiles(paths = "sf_SoutheastFlights.RData")
+```
 # Citation
 
 If you use *RGraphSpace*, please cite:
