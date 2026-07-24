@@ -359,7 +359,7 @@ Plot active airports:
 ```{r, eval=TRUE, message=FALSE}
 ggplot() +
   geom_sf(data=mapa_brasil, fill="light grey", color="dark grey", size=.15, show.legend = FALSE) +
-  labs(subtitle="Brazilian active airports in 2025") +
+  labs(subtitle=paste("Brazilian active airports in",year)) +
   geom_sf(data = active_airports,
           aes(geometry = geometry,
               color = type),
@@ -434,6 +434,21 @@ cities <- left_join(cities,cities2,by= "name")
 
 se_airports$pop <- cities[match(se_airports$municipio,cities$municipio),3]
 rm(cities,cities2,world.cities)
+se_airports$pop[is.na(se_airports$pop)] <- 0
+```
+
+Plot active airports in Brazil's Southeast Region:
+
+```{r, eval=TRUE, message=FALSE}
+ggplot() +
+  geom_sf(data=se_states, fill="light grey", color="dark grey", size=.15, show.legend = FALSE) +
+  geom_sf(data = se_airports,
+          aes(geometry = geometry,
+              color = type, 
+              size = pop)) +
+  labs(subtitle=paste("Brazil's Southeast Region active airports in",year),
+       y = "Latitude",x= "Longitude",color="Type",size="Population") +
+  theme_minimal() 
 ```
 
 **4) Retain only flights with both origin and destination in the Southeast Region.**
