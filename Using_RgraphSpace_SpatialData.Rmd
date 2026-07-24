@@ -33,15 +33,15 @@ knitr::opts_chunk$set(
 
 This vignette demonstrates how to use *RGraphSpace* to visualize graph data within a spatial coordinate system. The example uses Brazilian aviation data, in which airports are represented as nodes and flights as directed edges.
 
-This workflow is useful when graph elements need to be positioned according real-world coordinates, such as latitude and longitude, rather than an abstract graph layout. For visualization, *RGraphSpace* integrates *ggplot2* and *sf* packages,  allowing graph elements to be displayed together with geographic boundaries.
+This workflow is useful when graph elements need to be positioned according real-world coordinates, such as latitude and longitude, rather than an abstract graph layout. For visualization, *RGraphSpace* integrates *ggplot2* and *sf* packages, allowing graph elements to be displayed together with geographic boundaries.
 
 If you are not familiar with the basic structure of `GraphSpace` objects, we recommend consulting the [interoperability](https://sysbiolab.github.io/RGraphSpace/articles/interoperability.html) vignette first.
 
 ## Data and workflow overview
 
-This vignette uses preprocessed data, which are: flights records, active Brazilian airports and geographical boundaries of Brazil, and the Brazil's Southeast Region. For full reproducibility, the data-loading and filtering procedures are described in the [Preprocessing Aviation Data](https://flaviogckessler.github.io/PreprocessingAviationData/PreprocessingAviationData.html) vignette. The present example uses Brazilian flight records from 2024. 
+This vignette uses preprocessed data, which are: flights records, active Brazilian airports and geographical boundaries of Brazil, and the Brazil's Southeast Region. For full reproducibility, the data-loading and filtering procedures are described in the [Preprocessing Aviation Data](https://flaviogckessler.github.io/PreprocessingAviationData/PreprocessingAviationData.html) vignette. The present example uses Brazilian flight records from **2024**.
 
-All source data and code used during preprocessing are available in the  [Preprocessing Aviation Data GitHub repository](https://github.com/flaviogckessler/PreprocessingAviationData).
+All source data and code used during preprocessing are available in the [Preprocessing Aviation Data GitHub repository](https://github.com/flaviogckessler/PreprocessingAviationData).
 
 After the data are loaded, an *igraph* object is constructed by representing airports as vertices and flights as directed edges. The resulting graph is then converted into a *GraphSpace* object. Finally, a multilayered figure is constructed with *ggplot2* [@Wickham2016] by combining several *sf* objects with *RGraphSpace* geometric layers (`geoms`).
 
@@ -57,36 +57,18 @@ After the data are loaded, an *igraph* object is constructed by representing air
 
 ```{r check-required-packages, eval=TRUE, message=FALSE}
 # Check required packages for this vignette
-if(!require("ggplot2", quietly = TRUE)){
-  install.packages("ggplot2")
-}
-if(!require("dplyr", quietly = TRUE)){
-  install.packages("dplyr")
-}
-if(!require("sf", quietly = TRUE)){
-  install.packages("sf")
-}
-if(!require("rnaturalearth", quietly = TRUE)){
-  install.packages("rnaturalearth")
-}
+if(!require("ggplot2", quietly = TRUE)){install.packages("ggplot2")}
+if(!require("dplyr", quietly = TRUE)){install.packages("dplyr")}
+if(!require("sf", quietly = TRUE)){install.packages("sf")}
+if(!require("rnaturalearth", quietly = TRUE)){install.packages("rnaturalearth")}
+if(!require("igraph", quietly = TRUE)){install.packages("igraph")}
+if(!require("maps", quietly = TRUE)){install.packages("maps")}
+if(!require("ggpubr", quietly = TRUE)){install.packages("ggpubr")}
+if(!require("ggrepel", quietly = TRUE)){install.packages("ggrepel")}
 if(!require("rnaturalearthhires", quietly = TRUE)){
-  remotes::install_github("ropensci/rnaturalearthhires")
-}
-if(!require("igraph", quietly = TRUE)){
-  install.packages("igraph")
-}
-if(!require("maps", quietly = TRUE)){
-  install.packages("maps")
-}
-if(!require("ggpubr", quietly = TRUE)){
-  install.packages("ggpubr")
-}
-if(!require("ggrepel", quietly = TRUE)){
-  install.packages("ggrepel")
-}
+  remotes::install_github("ropensci/rnaturalearthhires")}
 if(!require("RGraphSpace", quietly = TRUE)){
-  remotes::install_github("sysbiolab/RGraphSpace", build_vignettes=TRUE)
-}
+  remotes::install_github("sysbiolab/RGraphSpace", build_vignettes=TRUE)}
 ```
 
 ```{r Load packages, eval=TRUE, message=FALSE}
@@ -100,23 +82,6 @@ library("ggrepel")
 library("ggpubr")
 ```
 
-# Defining a helper function
-
-The helper function below keeps only flights for which both the origin and destination airports are present in a given airport dataset.
-
-```{r, eval=TRUE, message=FALSE}
-only_from_airports <- function(flights,airports){
-  for(i in 1:length(flights[[1]])){
-    flights$accessory[i] <- flights[[1]][i] %in% airports$codigo_oaci &&
-      flights[[2]][i] %in% airports$codigo_oaci
-  }
-  flights_clean <- flights %>%
-    filter(accessory == TRUE) %>%
-    select(-c("accessory"))
-  
-  return(flights_clean)
-}
-```
 # Brazil-wide flight network
 
 ## Loading data
@@ -127,21 +92,15 @@ Here, we need to load the preprocessed RData.
 rdata_url <- paste0(
   "https://raw.githubusercontent.com/",
   "flaviogckessler/PreprocessingAviationData/",
-  "main/sf_brazilflights.RData"
-)
+  "main/sf_brazilflights.RData")
 
 rdata_file <- tempfile(fileext = ".RData")
-
-download.file(
-  url = rdata_url,
-  destfile = rdata_file,
-  mode = "wb",
-  quiet = TRUE
-)
+download.file(url = rdata_url,destfile = rdata_file,
+  mode = "wb",quiet = TRUE)
 
 loaded_objects <- load(rdata_file)
-
 loaded_objects
+
 rm(rdata_url,rdata_file,loaded_objects)
 ```
 
@@ -160,12 +119,9 @@ The loaded data comprise:
 Once the data have been loaded and filtered, the flight and airport datasets are fully compatible. We can therefore generate an *igraph* object using the flights as edges and the airports as vertices (nodes). To preserve the direction of each departure-arrival pair, the graph is directed. Moreover, the edges are weighted because we have the number of flights of each unique route.
 
 ```{r, eval=TRUE, message=FALSE}
-colnames(flights_cf) <- c("sg_icao_origem","sg_icao_destino","weight")
-
 graph_flights <- graph_from_data_frame(flights_cf,
                                        directed = TRUE,
                                        vertices = active_airports)
-graph_flights
 ```
 
 ### Converting *igraph* to *GraphSpace*
@@ -210,21 +166,15 @@ Next, we create a regional subset focusing on the airports from the Brazil's Sou
 rdata_url <- paste0(
   "https://raw.githubusercontent.com/",
   "flaviogckessler/PreprocessingAviationData/",
-  "main/sf_SoutheastFlights.RData"
-)
+  "main/sf_SoutheastFlights.RData")
 
 rdata_file <- tempfile(fileext = ".RData")
-
-download.file(
-  url = rdata_url,
-  destfile = rdata_file,
-  mode = "wb",
-  quiet = TRUE
-)
+download.file(url = rdata_url,destfile = rdata_file,
+  mode = "wb",quiet = TRUE)
 
 loaded_objects <- load(rdata_file)
-
 loaded_objects
+
 rm(rdata_url,rdata_file,loaded_objects)
 ```
 
@@ -235,7 +185,6 @@ The loaded data comprise:
 2.  Filtered flight records for Brazil’s Southeast Region (`se_flights`)
 
 3.  The geographic boundaries of Brazil's Southeast Region (`se_states`)
-
 
 ## Building the graph
 
@@ -280,6 +229,7 @@ h <- ggplot() +
        y = "Latitude",x= "Longitude",fill="Type",size="Population",linewidth=NULL) +
   theme_gspace_legend(key_fill = TRUE)+
   theme_minimal()
+
 h
 ```
 

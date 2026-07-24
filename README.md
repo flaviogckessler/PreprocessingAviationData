@@ -6,7 +6,7 @@ Flávio Gabriel Carazza-Kessler, Sysbiolab Team
 
 # Summary
 
-Here is performed the preprocessment of the data used in the RGraphSpace vignette, "Using RGraphSpace for spatial data analysis".
+Here is performed the preprocessment of the data used in the RGraphSpace vignette, [Using RGraphSpace for spatial data analysis](https://flaviogckessler.github.io/PreprocessingAviationData/Using_RgraphSpace_SpatialData.html).
 
 Please access the full preprocessment workflow: [Preprocessment Aviation Data](https://flaviogckessler.github.io/PreprocessingAviationData/PreprocessingAviationData.html)
 

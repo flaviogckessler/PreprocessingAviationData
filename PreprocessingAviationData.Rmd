@@ -373,6 +373,8 @@ After airport filtering, the `active_airports` contains only airports that meet 
 
 ```{r, eval=TRUE, message=FALSE, results='hide'}
 flights_cf <- only_from_airports(flights_cf,active_airports)
+
+colnames(flights_cf)[3] <- "weight"
 ```
 
 ## Saving Preprocessed data
