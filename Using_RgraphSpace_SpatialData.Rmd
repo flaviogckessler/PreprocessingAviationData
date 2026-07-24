@@ -92,7 +92,7 @@ Here, we need to load the preprocessed RData.
 rdata_url <- paste0(
   "https://raw.githubusercontent.com/",
   "flaviogckessler/PreprocessingAviationData/",
-  "main/sf_brazilflights.RData")
+  "main/data/sf_brazilflights.RData")
 
 rdata_file <- tempfile(fileext = ".RData")
 download.file(url = rdata_url,destfile = rdata_file,
@@ -166,7 +166,7 @@ Next, we create a regional subset focusing on the airports from the Brazil's Sou
 rdata_url <- paste0(
   "https://raw.githubusercontent.com/",
   "flaviogckessler/PreprocessingAviationData/",
-  "main/sf_SoutheastFlights.RData")
+  "main/data/sf_SoutheastFlights.RData")
 
 rdata_file <- tempfile(fileext = ".RData")
 download.file(url = rdata_url,destfile = rdata_file,
