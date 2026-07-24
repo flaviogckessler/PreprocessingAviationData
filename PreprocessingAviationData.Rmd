@@ -455,6 +455,8 @@ ggplot() +
 
 ```{r, eval=TRUE, message=FALSE}
 se_flights <- only_from_airports(flights_cf,se_airports)
+
+colnames(se_flights)[3] <- "weight"
 ```
 
 **5) Save the preprocessed flight data for Brazil’s Southeast Region.**

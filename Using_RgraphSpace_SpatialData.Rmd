@@ -1,0 +1,333 @@
+---
+title: "Using RGraphSpace for spatial data analysis"
+author: 
+- name: Flávio Gabriel Carazza-Kessler
+- name: Sysbiolab Team
+date: "`r Sys.Date()`"
+bibliography: bibliography.bib
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+vignette: >
+  %\VignetteIndexEntry{Using RGraphSpace for spatial data analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE, purl=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  collapse = TRUE,
+  comment = "#>",
+  fig.align = "center",
+  fig.width = 7,
+  fig.height = 5
+  )
+```
+
+<br/> **Package**: RGraphSpace `r packageVersion('RGraphSpace')`
+
+# Overview
+
+This vignette demonstrates how to use *RGraphSpace* to visualize graph data within a spatial coordinate system. The example uses Brazilian aviation data, in which airports are represented as nodes and flights as directed edges.
+
+This workflow is useful when graph elements need to be positioned according real-world coordinates, such as latitude and longitude, rather than an abstract graph layout. For visualization, *RGraphSpace* integrates *ggplot2* and *sf* packages,  allowing graph elements to be displayed together with geographic boundaries.
+
+If you are not familiar with the basic structure of `GraphSpace` objects, we recommend consulting the [interoperability](https://sysbiolab.github.io/RGraphSpace/articles/interoperability.html) vignette first.
+
+## Data and workflow overview
+
+This vignette uses preprocessed data, which are: flights records, active Brazilian airports and geographical boundaries of Brazil, and the Brazil's Southeast Region. For full reproducibility, the data-loading and filtering procedures are described in the [Preprocessing Aviation Data](https://flaviogckessler.github.io/PreprocessingAviationData/PreprocessingAviationData.html) vignette. The present example uses Brazilian flight records from 2024. 
+
+All source data and code used during preprocessing are available in the  [Preprocessing Aviation Data GitHub repository](https://github.com/flaviogckessler/PreprocessingAviationData).
+
+After the data are loaded, an *igraph* object is constructed by representing airports as vertices and flights as directed edges. The resulting graph is then converted into a *GraphSpace* object. Finally, a multilayered figure is constructed with *ggplot2* [@Wickham2016] by combining several *sf* objects with *RGraphSpace* geometric layers (`geoms`).
+
+# Before you start
+
+**Computational requirement:**
+
+- Hardware: RAM \>= 12 GB
+
+- Software: R (\>=4.5) and RStudio
+
+# Required Packages
+
+```{r check-required-packages, eval=TRUE, message=FALSE}
+# Check required packages for this vignette
+if(!require("ggplot2", quietly = TRUE)){
+  install.packages("ggplot2")
+}
+if(!require("dplyr", quietly = TRUE)){
+  install.packages("dplyr")
+}
+if(!require("sf", quietly = TRUE)){
+  install.packages("sf")
+}
+if(!require("rnaturalearth", quietly = TRUE)){
+  install.packages("rnaturalearth")
+}
+if(!require("rnaturalearthhires", quietly = TRUE)){
+  remotes::install_github("ropensci/rnaturalearthhires")
+}
+if(!require("igraph", quietly = TRUE)){
+  install.packages("igraph")
+}
+if(!require("maps", quietly = TRUE)){
+  install.packages("maps")
+}
+if(!require("ggpubr", quietly = TRUE)){
+  install.packages("ggpubr")
+}
+if(!require("ggrepel", quietly = TRUE)){
+  install.packages("ggrepel")
+}
+if(!require("RGraphSpace", quietly = TRUE)){
+  remotes::install_github("sysbiolab/RGraphSpace", build_vignettes=TRUE)
+}
+```
+
+```{r Load packages, eval=TRUE, message=FALSE}
+# Load packages
+library("RGraphSpace")
+library("ggplot2")
+library("dplyr")
+library("sf")
+library("igraph")
+library("ggrepel")
+library("ggpubr")
+```
+
+# Defining a helper function
+
+The helper function below keeps only flights for which both the origin and destination airports are present in a given airport dataset.
+
+```{r, eval=TRUE, message=FALSE}
+only_from_airports <- function(flights,airports){
+  for(i in 1:length(flights[[1]])){
+    flights$accessory[i] <- flights[[1]][i] %in% airports$codigo_oaci &&
+      flights[[2]][i] %in% airports$codigo_oaci
+  }
+  flights_clean <- flights %>%
+    filter(accessory == TRUE) %>%
+    select(-c("accessory"))
+  
+  return(flights_clean)
+}
+```
+# Brazil-wide flight network
+
+## Loading data
+
+Here, we need to load the preprocessed RData.
+
+```{r, eval=TRUE, message=FALSE}
+rdata_url <- paste0(
+  "https://raw.githubusercontent.com/",
+  "flaviogckessler/PreprocessingAviationData/",
+  "main/sf_brazilflights.RData"
+)
+
+rdata_file <- tempfile(fileext = ".RData")
+
+download.file(
+  url = rdata_url,
+  destfile = rdata_file,
+  mode = "wb",
+  quiet = TRUE
+)
+
+loaded_objects <- load(rdata_file)
+
+loaded_objects
+rm(rdata_url,rdata_file,loaded_objects)
+```
+
+The loaded data comprise:
+
+1.  Active Brazilian airports in the selected year (`active_airports`)
+
+2.  Filtered flight records (`flights_cf`)
+
+3.  The geographic boundaries of Brazil (`mapa_brasil`)
+
+## Building the graph
+
+### Creating an *igraph* object
+
+Once the data have been loaded and filtered, the flight and airport datasets are fully compatible. We can therefore generate an *igraph* object using the flights as edges and the airports as vertices (nodes). To preserve the direction of each departure-arrival pair, the graph is directed. Moreover, the edges are weighted because we have the number of flights of each unique route.
+
+```{r, eval=TRUE, message=FALSE}
+colnames(flights_cf) <- c("sg_icao_origem","sg_icao_destino","weight")
+
+graph_flights <- graph_from_data_frame(flights_cf,
+                                       directed = TRUE,
+                                       vertices = active_airports)
+graph_flights
+```
+
+### Converting *igraph* to *GraphSpace*
+
+With the *igraph* object, we can readily convert it to a *GraphSpace* object using `GraphSpace()` function. The object is an S4 class, its nodes spot must contain columns named `x` and `y` for further usage of *RGraphSpace* `geoms`.
+
+Although the coordinate system of an *GraphSpace* object is generally normalized to values between 0 and 1, here we keep the original latitude and longitude values. This is necessary because the graph coordinates must align with the *sf* object.
+
+```{r, eval=TRUE, message=FALSE}
+gs_flight <- GraphSpace(graph_flights)
+gs_flight@nodes$x <- gs_flight@nodes$longitude
+gs_flight@nodes$y <- gs_flight@nodes$latitude
+```
+
+## Visualizing spatial networks
+
+```{r, eval=TRUE, message=FALSE}
+g <- ggplot() +
+  geom_sf(data=mapa_brasil, fill="light grey", color="dark grey", size=.15, show.legend = FALSE) +
+  geom_edgespace(aes(colour = log10(weight)), arrow_size = 0.5, 
+                 arrow_offset = 0.01, data = gs_flight) + 
+  scale_colour_continuous(palette = c("cyan","blue")) +
+  geom_nodespace(aes(fill=type),size=1.5,data = gs_flight) +
+  scale_fill_discrete(palette = c("#00BFC4","#F8766D")) + 
+  labs(subtitle="Domestic flights in Brazil in 2024",colour="Log10 (n°of flights)",
+       y = "Latitude",x= "Longitude",fill="Type") +
+  theme_gspace_legend(key_fill = TRUE)+
+  theme_minimal()
+
+g
+```
+
+The figure above uses two `geoms` from *RGraphSpace*: (i) `geom_edgespace()`, and (ii) `geom_nodespace()`. Colour and fill aesthetics are used for edges and nodes mapping, respectively. Moreover, the figure followes the *ggplot2* grammar and demonstrates interoperability with the *sf* package. In the next plot, additional aesthetics mappings are used.
+
+# Southeast regional network
+
+Next, we create a regional subset focusing on the airports from the Brazil's Southeast Region, which includes some of the busiest airports in the country. The goal is to examine the relationship between flight frequency and the population of the city served by each airport.
+
+## Load the preprocessed data
+
+```{r, eval=TRUE, message=FALSE}
+rdata_url <- paste0(
+  "https://raw.githubusercontent.com/",
+  "flaviogckessler/PreprocessingAviationData/",
+  "main/sf_SoutheastFlights.RData"
+)
+
+rdata_file <- tempfile(fileext = ".RData")
+
+download.file(
+  url = rdata_url,
+  destfile = rdata_file,
+  mode = "wb",
+  quiet = TRUE
+)
+
+loaded_objects <- load(rdata_file)
+
+loaded_objects
+rm(rdata_url,rdata_file,loaded_objects)
+```
+
+The loaded data comprise:
+
+1.  Active airports in Brazil’s Southeast Region during the selected year (`se_airports`)
+
+2.  Filtered flight records for Brazil’s Southeast Region (`se_flights`)
+
+3.  The geographic boundaries of Brazil's Southeast Region (`se_states`)
+
+
+## Building the graph
+
+### Creating an *igraph* object
+
+```{r, eval=TRUE, message=FALSE}
+graph_se_flights <- graph_from_data_frame(se_flights,
+                                       directed = TRUE,
+                                       vertices = se_airports)
+```
+
+### Converting *igraph* to *GraphSpace*
+
+```{r, eval=TRUE, message=FALSE}
+gs_se_flight <- GraphSpace(graph_se_flights)
+gs_se_flight@nodes$x <- gs_se_flight@nodes$longitude
+gs_se_flight@nodes$y <- gs_se_flight@nodes$latitude
+```
+
+## Visualizing spatial networks
+
+```{r, eval=TRUE, message=FALSE}
+h <- ggplot() +
+  geom_sf(data=se_states, fill="light grey", color="red", size=.5, show.legend = FALSE) +
+  coord_sf(xlim = c(-53,-40))+
+  geom_edgespace(aes(colour = log10(weight),linewidth=log10(weight)), arrow_size = 0.5, 
+                 arrow_offset = 0.05, data = gs_se_flight) + 
+  scale_colour_continuous(palette = c("cyan","blue")) +
+  scale_linewidth(guide='none')+
+  geom_nodespace(aes(fill=type,size = pop),data = gs_se_flight) +
+  geom_label_repel(aes(label = gs_se_flight@nodes$name,
+                       x=gs_se_flight@nodes$x,
+                       y=gs_se_flight@nodes$y),
+                   box.padding   = 0.35, 
+                   point.padding = 0.5,
+                   size = 3,
+                   segment.color = 'grey50') +
+  scale_size(range = c(1,10)) +
+  scale_fill_discrete(palette = c("#F8766D","#00BFC4")) +  
+  inject_nodespace() +
+  labs(subtitle="Domestic flights in Southeast Region from Brazil in 2024",colour="Log10 (n°of flights)",
+       y = "Latitude",x= "Longitude",fill="Type",size="Population",linewidth=NULL) +
+  theme_gspace_legend(key_fill = TRUE)+
+  theme_minimal()
+h
+```
+
+This plot uses colour and linewidth aesthetics for edges and fill and size aesthetics for nodes. The utility function `inject_nodespace()` transfer node-size information to the edge layer, enabling it to become "node-aware" prior to final rendering. Therefore, the arrows can align with node when node sizes vary.
+
+# Combining plots
+
+Generation a geometry union with all Southeast region states:
+
+```{r, eval=TRUE, message=FALSE}
+single_sf <- st_union(se_states$geometry[1]) %>%
+  st_union(se_states$geometry[2]) %>%
+  st_union(se_states$geometry[3]) %>%
+  st_union(se_states$geometry[4])
+```
+
+Final figure arrangement:
+
+```{r, eval=TRUE, message=FALSE}
+g <- g + geom_sf(data=single_sf, fill="light grey", color="red",alpha=0, size=1, show.legend = FALSE)
+
+ggarrange(g,h,
+          labels = c("A","B"),
+          font.label = list(size=22,face="bold"),
+          ncol = 2,nrow=1)
+```
+
+Saving figure:
+
+```{r, eval=TRUE, message=FALSE}
+png('Flights_RGraphSpace.png', units="in", width=12, height=6, res=300)
+ggarrange(g,h,
+          labels = c("A","B"),
+          font.label = list(size=22,face="bold"),
+          ncol = 2,nrow=1)
+dev.off()
+```
+
+# Citation
+
+If you use *RGraphSpace*, please cite:
+
+- Sysbiolab Team (2026). RGraphSpace: A lightweight interface between 'igraph' and 'ggplot2' graphics. R package version 1.2.4. DOI: 10.32614/CRAN.package.RGraphSpace
+
+# Session information
+
+```{r label='Session information', eval=TRUE, echo=FALSE}
+sessionInfo()
+```
+
+# References
