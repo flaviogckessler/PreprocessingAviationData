@@ -276,7 +276,7 @@ h <- ggplot() +
   scale_size(range = c(1,10)) +
   scale_fill_discrete(palette = c("#F8766D","#00BFC4")) +  
   inject_nodespace() +
-  labs(subtitle="Domestic flights in Southeast Region from Brazil in 2024",colour="Log10 (n°of flights)",
+  labs(subtitle="Domestic flights in Brazil's Southeast Region in 2024",colour="Log10 (n°of flights)",
        y = "Latitude",x= "Longitude",fill="Type",size="Population",linewidth=NULL) +
   theme_gspace_legend(key_fill = TRUE)+
   theme_minimal()
@@ -298,7 +298,7 @@ single_sf <- st_union(se_states$geometry[1]) %>%
 
 Final figure arrangement:
 
-```{r, eval=TRUE, message=FALSE}
+```{r combined-flight-maps, eval=TRUE, message=FALSE, fig.width=11.5,fig.height=5.2, out.width="100%",fig.align="center",fig.retina=2}
 g <- g + geom_sf(data=single_sf, fill="light grey", color="red",alpha=0, size=1, show.legend = FALSE)
 
 ggarrange(g,h,
